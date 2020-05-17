@@ -85,14 +85,9 @@ void register_write (int device, int address, uint32_t value) {
 
 	write (device,&register_write_frame,sizeof(register_write_frame));
 
-	// Read the write response back
+	// Read the write register response back (10 bytes) and ignore
 	uint8_t buf[10];
 	read (device,buf,10);
-	for (int i = 0; i < 10; i++) {
-		//fprintf (stdout, " %02x ", buf[i]);
-	}
-	//fprintf (stdout,"\n");
-
 }
 
 void register_read (int device, int address, uint32_t *value) {
@@ -123,6 +118,9 @@ void register_read (int device, int address, uint32_t *value) {
 	*value = register_read_response.value;
 }
 
+/**
+ * Download values of registers and print to stdout.
+ */
 void dump_registers (int device) {
 	uint32_t value;
 	for (int i = 0x2; i <= 0x29; i++) {
@@ -176,7 +174,7 @@ void dump_data (int device) {
 			//fprintf (stdout,".");
 		} while (b != 0xCC);
 
-
+		// timestamp of reception of start of frame 
 		clock_gettime(CLOCK_REALTIME, &timestamp);
 
 		read(device, &stream_frame_header, sizeof(stream_frame_header));
@@ -215,34 +213,16 @@ void dump_data (int device) {
 void envelope_service (int device) {
 	// envelope service mode
 	register_write (device, 0x02, 0x02);
+
+	// from 65mm to 150mm
 	register_write (device, 0x20, 0x41);
 	register_write (device, 0x21, 0x96);
-
-	dump_registers (device);
-
-
 
 	// start streaming
 	register_write (device, 0x05, 0x01);
 
 	register_write (device, 0x03, 0x03);
 
-	uint8_t i,buf;
-	uint32_t value;
-
-/*
-	for (i = 0; i < 1000; i++) {
-
-		register_write (device, 0x03, 0x04);
-		do {
-			fprintf (stdout,"*");
-			register_read(device, 0x06, &value);
-		} while (value&0x100 == 0);
-
-		read (device, &buf, sizeof(buf));
-		fprintf (stdout,"%02x ",buf);
-	}
-*/
 	dump_data (device);
 
 	// stop
@@ -254,11 +234,8 @@ void main (int argc, char **argv) {
 	int device = open ("/dev/ttyUSB0", O_RDWR | O_NOCTTY | O_SYNC);
 	set_interface_attribs (device, B115200, 0);  // set speed to 115,200 bps, 8n1 (no parity)
 
-	//peak_service(device);
 	envelope_service(device);
 	dump_data (device);
 
-	//envelope_mode(device);
-	
 }
 
