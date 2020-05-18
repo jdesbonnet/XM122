@@ -9,6 +9,10 @@
 #include <time.h>
 #include <signal.h>
 
+#define MODE_ENVELOPE  2
+#define MODE_IQ 3
+
+
 
 // Signal handler sets this to 1 when signal received.
 // Monitored by data dump loop to exit.
@@ -269,6 +273,27 @@ void exit_handler(void) {
 
 void main (int argc, char **argv) {
 
+	int mode = 0;
+
+	// Parse command line arguments. See usage() for details.
+	char c;
+	while ((c = getopt(argc, argv, "abcd:f:hmn:qs:t:vzT:")) != -1) {
+		switch(c) {
+
+			case 'm':
+				if (strcmp(optarg,"envelope")==0) {
+					mode = MODE_ENVELOPE;
+				} else if (strcmp(optarg,"ppm")==0) {
+					mode = MODE_IQ;
+				} else {
+					//error ("unrecognized output format '%s'\n",optarg);
+					exit(-1);
+				}
+           		 	break;
+
+		}
+	}
+
 	// Setup event handlers
 	atexit(exit_handler);
 
@@ -288,8 +313,14 @@ void main (int argc, char **argv) {
 	// Copy to global for exit handler
 	//uart_device_handle = device;
 
-	envelope_service(device);
-	dump_data (device);
+	switch (mode) {
+		case MODE_ENVELOPE:
+		envelope_service(device);
+		break;
+		case MODE_IQ:
+		iq_service(device);
+		break;
+	}
 
 }
 
