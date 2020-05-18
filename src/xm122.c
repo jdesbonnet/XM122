@@ -1,15 +1,20 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <fcntl.h> 
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
 #include <time.h>
+#include <signal.h>
 
-int
-set_interface_attribs (int fd, int speed, int parity)
-{
+
+// Signal handler sets this to 1 when signal received.
+// Monitored by data dump loop to exit.
+int stop_signal = 0;
+
+int uart_set_interface_attribs (int fd, int speed, int parity) {
         struct termios tty;
         if (tcgetattr (fd, &tty) != 0)
         {
@@ -47,9 +52,7 @@ set_interface_attribs (int fd, int speed, int parity)
         return 0;
 }
 
-void
-set_blocking (int fd, int should_block)
-{
+void uart_set_blocking (int fd, int should_block) {
         struct termios tty;
         memset (&tty, 0, sizeof tty);
         if (tcgetattr (fd, &tty) != 0)
@@ -166,7 +169,7 @@ void dump_data (int device) {
  	uint8_t b;
 	struct timespec timestamp; 
 
-	while (1) {
+	while ( ! stop_signal ) {
 
 		// seek start of frame
 		do {
@@ -214,7 +217,27 @@ void envelope_service (int device) {
 	// envelope service mode
 	register_write (device, 0x02, 0x02);
 
-	// from 65mm to 150mm
+	// range from 65mm 
+	register_write (device, 0x20, 0x41);
+	// range length 150mm (from 65mm to 215mm)
+	register_write (device, 0x21, 0x96);
+
+	// start streaming
+	register_write (device, 0x05, 0x01);
+
+	register_write (device, 0x03, 0x03);
+
+	dump_data (device);
+
+	// stop
+	register_write (device, 0x03, 0x00);
+}
+
+void iq_service (int device) {
+	// IQ service mode
+	register_write (device, 0x02, 0x03);
+
+	// set range
 	register_write (device, 0x20, 0x41);
 	register_write (device, 0x21, 0x96);
 
@@ -229,13 +252,47 @@ void envelope_service (int device) {
 	register_write (device, 0x03, 0x00);
 }
 
+
+
+/**
+ * Signal handler for handling SIGPIPE and...
+ */
+void signal_handler(int signum, siginfo_t *info, void *ptr) {
+	fprintf (stdout, "Received signal %d originating from PID %lu\n", signum, (unsigned long)info->si_pid);
+	//register_write (uart_device_handle, 0x03, 0x00);
+	stop_signal = 1;
+}
+
+void exit_handler(void) {
+	//debug(1,"exit_handler():");
+}
+
 void main (int argc, char **argv) {
 
+	// Setup event handlers
+	atexit(exit_handler);
+
+	// Setup signal handler. Catching SIGPIPE allows for exit when 
+	// piping to Wireshark for live packet feed.
+	//signal(SIGPIPE, signal_handler);
+	struct sigaction act;
+	memset(&act, 0, sizeof(act));
+	act.sa_sigaction = signal_handler;
+	act.sa_flags = SA_SIGINFO;
+	sigaction(SIGPIPE, &act, NULL);
+
+
 	int device = open ("/dev/ttyUSB0", O_RDWR | O_NOCTTY | O_SYNC);
-	set_interface_attribs (device, B115200, 0);  // set speed to 115,200 bps, 8n1 (no parity)
+	uart_set_interface_attribs (device, B115200, 0);  // set speed to 115,200 bps, 8n1 (no parity)
+
+	// Copy to global for exit handler
+	//uart_device_handle = device;
 
 	envelope_service(device);
 	dump_data (device);
 
 }
+
+
+
 
