@@ -386,19 +386,19 @@ void exit_handler(void) {
 
 void main (int argc, char **argv) {
 
-	int mode = 2;
+	int mode = -1;
 
-/*
 	// Parse command line arguments. See usage() for details.
 	char c;
 	while ((c = getopt(argc, argv, "m:")) != -1) {
 		switch(c) {
-
 			case 'm':
 				if (strcmp(optarg,"envelope")==0) {
 					mode = MODE_ENVELOPE;
+fprintf (stderr,"envelope mode\n");
 				} else if (strcmp(optarg,"iq")==0) {
 					mode = MODE_IQ;
+fprintf (stderr,"iq mode\n");
 				} else {
 					fprintf (stderr,"unrecognized output format '%s'\n",optarg);
 					exit(-1);
@@ -407,7 +407,7 @@ void main (int argc, char **argv) {
 
 		}
 	}
-*/
+
 fprintf(stderr,"mode=%d\n",mode);
 
 	// Setup event handlers
@@ -435,13 +435,16 @@ fprintf(stderr,"mode=%d\n",mode);
 		envelope_service(device);
 		break;
 		case MODE_IQ:
-		//iq_service(device);
+		iq_service(device);
 		break;
 		default:
 		fprintf(stderr,"unknown mode\n");
 		break;
 	}
 
+	// Clear UART buffer
+	sleep(2);
+	tcflush(device,TCIOFLUSH);
 }
 
 
