@@ -390,7 +390,7 @@ void main (int argc, char **argv) {
 
 	// Parse command line arguments. See usage() for details.
 	char c;
-	while ((c = getopt(argc, argv, "m:")) != -1) {
+	while ((c = getopt(argc, argv, "m:")) != 255) { // was -1 ??
 		switch(c) {
 			case 'm':
 				if (strcmp(optarg,"envelope")==0) {
