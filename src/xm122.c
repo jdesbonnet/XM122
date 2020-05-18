@@ -74,6 +74,8 @@ void uart_set_blocking (int fd, int should_block) {
 
 void register_write (int device, int address, uint32_t value) {
 
+fprintf(stderr,"%d %d\n",address,value);
+
 	struct __attribute__((__packed__))  {
 		uint8_t start_marker;
 		uint16_t payload_len;
@@ -273,26 +275,29 @@ void exit_handler(void) {
 
 void main (int argc, char **argv) {
 
-	int mode = 0;
+	int mode = 2;
 
+/*
 	// Parse command line arguments. See usage() for details.
 	char c;
-	while ((c = getopt(argc, argv, "abcd:f:hmn:qs:t:vzT:")) != -1) {
+	while ((c = getopt(argc, argv, "m:")) != -1) {
 		switch(c) {
 
 			case 'm':
 				if (strcmp(optarg,"envelope")==0) {
 					mode = MODE_ENVELOPE;
-				} else if (strcmp(optarg,"ppm")==0) {
+				} else if (strcmp(optarg,"iq")==0) {
 					mode = MODE_IQ;
 				} else {
-					//error ("unrecognized output format '%s'\n",optarg);
+					fprintf (stderr,"unrecognized output format '%s'\n",optarg);
 					exit(-1);
 				}
            		 	break;
 
 		}
 	}
+*/
+fprintf(stderr,"mode=%d\n",mode);
 
 	// Setup event handlers
 	atexit(exit_handler);
@@ -318,7 +323,10 @@ void main (int argc, char **argv) {
 		envelope_service(device);
 		break;
 		case MODE_IQ:
-		iq_service(device);
+		//iq_service(device);
+		break;
+		default:
+		fprintf(stderr,"unknown mode\n");
 		break;
 	}
 
