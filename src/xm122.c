@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <signal.h>
+#include <byteswap.h>
 
 #define MODE_ENVELOPE  2
 #define MODE_IQ 3
@@ -161,7 +162,7 @@ void peak_service (int device) {
 	register_write (device, 0x03, 0x00);
 }
 
-void dump_data (int device) {
+void dump_envelope_data (int device) {
 
 	struct __attribute__((__packed__))  {
 		uint16_t payload_len;
@@ -178,7 +179,6 @@ void dump_data (int device) {
 		// seek start of frame
 		do {
 			read(device, &b, 1);
-			//fprintf (stdout,".");
 		} while (b != 0xCC);
 
 		// timestamp of reception of start of frame 
@@ -190,31 +190,136 @@ void dump_data (int device) {
 
 			while (n <  stream_frame_header.payload_len) {
 				n += read(device, buf+n, stream_frame_header.payload_len - n);
-				//fprintf (stdout,"&");
 			}
 
-/*
-			fprintf(stdout,"\nn=%d\n",n);
-			for (int i = 0; i < stream_frame_header.payload_len; i++) {
-				if ( i == stream_frame_header.payload_len) {
-					fprintf (stdout, " | ");
-				}
-				fprintf (stdout," %02x", buf[i]);
-			}
-			fprintf(stdout,"\n");
-*/
 			uint16_t *v;
+			// timestamp to ms resolution
 			fprintf (stdout, "%ld.%03ld", timestamp.tv_sec, timestamp.tv_nsec/1000000);
 			for (int i = 12; i < stream_frame_header.payload_len; i+=2) {
 				v = (uint16_t *) &buf[i];
 				fprintf (stdout, " %4d", *v);
 			}
 			fprintf(stdout,"\n");
-			//fprintf (stdout, "*");
-		} else {
-			fprintf (stdout, "X");
+
+		} 
+	}
+	fprintf (stderr,"stop signal received\n");
+}
+
+/**
+ * Data sheet seems to be wrong: complex numbers respresented by pair of int16_t.
+ */
+void dump_iq_data (int device) {
+
+	struct __attribute__((__packed__))  {
+		uint16_t payload_len;
+		uint8_t packet_type;
+	} stream_frame_header;
+
+	uint8_t buf[4096];
+
+ 	uint8_t b;
+	struct timespec timestamp; 
+
+	while ( ! stop_signal ) {
+
+		// seek start of frame
+		do {
+			read(device, &b, 1);
+		} while (b != 0xCC);
+
+		// timestamp of reception of start of frame 
+		clock_gettime(CLOCK_REALTIME, &timestamp);
+
+		read(device, &stream_frame_header, sizeof(stream_frame_header));
+		if (stream_frame_header.packet_type == 0xFE) {
+			int n = 0;
+
+			while (n <  stream_frame_header.payload_len) {
+				n += read(device, buf+n, stream_frame_header.payload_len - n);
+			}
+
+			int16_t *v;
+			// timestamp to ms resolution
+			fprintf (stdout, "%ld.%03ld", timestamp.tv_sec, timestamp.tv_nsec/1000000);
+			for (int i = 12; i < stream_frame_header.payload_len; i+=2) {
+				v = (int16_t *) &buf[i];
+				fprintf (stdout, " %4d", *v);
+			}
+			fprintf(stdout,"\n");
+
+		} 
+	}
+	fprintf (stderr,"stop signal received\n");
+}
+
+
+float ieee_float(uint32_t f)
+{
+    union int_float{
+        uint32_t i;
+        float f;
+    } tofloat;
+
+    tofloat.i = f;
+    return tofloat.f;
+}
+
+void dump_float_iq_data (int device) {
+
+	struct __attribute__((__packed__))  {
+		uint16_t payload_len;
+		uint8_t packet_type;
+	} stream_frame_header;
+
+	uint8_t buf[4096];
+
+ 	uint8_t b;
+	struct timespec timestamp; 
+
+	while ( ! stop_signal ) {
+
+		// seek start of frame
+		do {
+			read(device, &b, 1);
+		} while (b != 0xCC);
+
+		// timestamp of reception of start of frame 
+		clock_gettime(CLOCK_REALTIME, &timestamp);
+
+		read(device, &stream_frame_header, sizeof(stream_frame_header));
+		if (stream_frame_header.packet_type == 0xFE) {
+			int n = 0;
+
+			while (n <  stream_frame_header.payload_len) {
+				n += read(device, buf+n, stream_frame_header.payload_len - n);
+			}
+
+			for (int i = 0; i <  stream_frame_header.payload_len; i++) {
+				fprintf (stderr," %02x", buf[i]);
+			}
+			fprintf (stderr,"\n");
+
+			uint32_t *v = (uint32_t *)&buf[16];
+			uint32_t vs;
+			float *f;
+			float fs,ff;
+			// timestamp to ms resolution
+			fprintf (stdout, "%ld.%03ld", timestamp.tv_sec, timestamp.tv_nsec/1000000);
+			for (int i = 12; i < stream_frame_header.payload_len; i+=4) {
+				vs = __bswap_32(*v);
+				f = (float *)v;
+				ff = ieee_float(*v);
+				fs = ieee_float(vs);
+		//		fprintf (stdout, " %08x %08x %e %e | ", *v, vs, ff, fs );
+				fprintf (stdout, " %e ", fs );
+				v++;
+			}
+			fprintf(stdout,"\n");
+
 		}
 	}
+	fprintf (stderr,"stop signal received\n");
 }
 
 void envelope_service (int device) {
@@ -231,7 +336,7 @@ void envelope_service (int device) {
 
 	register_write (device, 0x03, 0x03);
 
-	dump_data (device);
+	dump_envelope_data (device);
 
 	// stop
 	register_write (device, 0x03, 0x00);
@@ -250,7 +355,8 @@ void iq_service (int device) {
 
 	register_write (device, 0x03, 0x03);
 
-	dump_data (device);
+	//dump_iq_data (device);
+	dump_iq_data (device);
 
 	// stop
 	register_write (device, 0x03, 0x00);
@@ -264,6 +370,11 @@ void iq_service (int device) {
 void signal_handler(int signum, siginfo_t *info, void *ptr) {
 	fprintf (stdout, "Received signal %d originating from PID %lu\n", signum, (unsigned long)info->si_pid);
 	//register_write (uart_device_handle, 0x03, 0x00);
+
+	if (stop_signal) {
+		exit (-1);
+	}
+
 	stop_signal = 1;
 }
 
@@ -277,13 +388,13 @@ void main (int argc, char **argv) {
 
 	// Parse command line arguments. See usage() for details.
 	char c;
-	while ((c = getopt(argc, argv, "abcd:f:hmn:qs:t:vzT:")) != -1) {
+	while ((c = getopt(argc, argv, "m:")) != -1) {
 		switch(c) {
 
 			case 'm':
 				if (strcmp(optarg,"envelope")==0) {
 					mode = MODE_ENVELOPE;
-				} else if (strcmp(optarg,"ppm")==0) {
+				} else if (strcmp(optarg,"iq")==0) {
 					mode = MODE_IQ;
 				} else {
 					//error ("unrecognized output format '%s'\n",optarg);
@@ -305,6 +416,7 @@ void main (int argc, char **argv) {
 	act.sa_sigaction = signal_handler;
 	act.sa_flags = SA_SIGINFO;
 	sigaction(SIGPIPE, &act, NULL);
+	sigaction(SIGINT, &act, NULL);
 
 
 	int device = open ("/dev/ttyUSB0", O_RDWR | O_NOCTTY | O_SYNC);
