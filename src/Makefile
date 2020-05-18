@@ -1,5 +1,5 @@
-#CC=gcc -O3
-CC=gcc -g
+CC=gcc -O3
+#CC=gcc -g
 DEPS=
 SOURCES=xm122.c
 

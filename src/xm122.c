@@ -389,26 +389,25 @@ void main (int argc, char **argv) {
 	int mode = -1;
 
 	// Parse command line arguments. See usage() for details.
-	char c;
-	while ((c = getopt(argc, argv, "m:")) != 255) { // was -1 ??
+	// declaration 'char c' does not work on Raspberry Pi. 
+	// char seems to be redefined as uint8_t or something
+	// -1 tests as 255 !!??!!
+	//char c;
+	int8_t c;
+	while ((c = getopt(argc, argv, "m:")) != -1) { 
 		switch(c) {
 			case 'm':
 				if (strcmp(optarg,"envelope")==0) {
 					mode = MODE_ENVELOPE;
-fprintf (stderr,"envelope mode\n");
 				} else if (strcmp(optarg,"iq")==0) {
 					mode = MODE_IQ;
-fprintf (stderr,"iq mode\n");
 				} else {
 					fprintf (stderr,"unrecognized output format '%s'\n",optarg);
 					exit(-1);
 				}
            		 	break;
-
 		}
 	}
-
-fprintf(stderr,"mode=%d\n",mode);
 
 	// Setup event handlers
 	atexit(exit_handler);
