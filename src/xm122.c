@@ -370,7 +370,7 @@ void iq_service (int device) {
  * Signal handler for handling SIGPIPE and...
  */
 void signal_handler(int signum, siginfo_t *info, void *ptr) {
-	fprintf (stdout, "Received signal %d originating from PID %lu\n", signum, (unsigned long)info->si_pid);
+	fprintf (stderr, "Received signal %d originating from PID %lu\n", signum, (unsigned long)info->si_pid);
 	//register_write (uart_device_handle, 0x03, 0x00);
 
 	if (stop_signal) {
