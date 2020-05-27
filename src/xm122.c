@@ -19,6 +19,10 @@
 // Monitored by data dump loop to exit.
 int stop_signal = 0;
 
+void usage() {
+	fprintf (stderr, "xm122 [-m mode] [-r start-of-range-cm] [-l length-of-range-cm]\n");
+}
+
 int uart_set_interface_attribs (int fd, int speed, int parity) {
         struct termios tty;
         if (tcgetattr (fd, &tty) != 0)
@@ -93,6 +97,7 @@ fprintf(stderr,"%d %d\n",address,value);
 	register_write_frame.value = value;
 	register_write_frame.end_marker = 0xCD;
 
+	// TODO: not gauranteed that all will be written in open write() call
 	write (device,&register_write_frame,sizeof(register_write_frame));
 
 	// Read the write register response back (10 bytes) and ignore
@@ -171,7 +176,7 @@ void dump_envelope_data (int device) {
 		uint8_t packet_type;
 	} stream_frame_header;
 
-	uint8_t buf[4096];
+	uint8_t buf[8192];
 
  	uint8_t b;
 	struct timespec timestamp; 
@@ -324,14 +329,19 @@ void dump_float_iq_data (int device) {
 	fprintf (stderr,"stop signal received\n");
 }
 
-void envelope_service (int device) {
+
+/**
+ * 
+ * @param r start of raange (cm from sensor)
+ * @param l length of range (cm starting at r cm from sensor)
+ */
+void envelope_service (int device, int r, int l) {
 	// envelope service mode
 	register_write (device, 0x02, 0x02);
 
-	// range from 65mm 
-	register_write (device, 0x20, 0x41);
-	// range length 150mm (from 65mm to 215mm)
-	register_write (device, 0x21, 0x96);
+	// range  
+	register_write (device, 0x20, r);
+	register_write (device, 0x21, l);
 
 	// start streaming
 	register_write (device, 0x05, 0x01);
@@ -394,8 +404,12 @@ void main (int argc, char **argv) {
 	// -1 tests as 255 !!??!!
 	//char c;
 	int8_t c;
-	while ((c = getopt(argc, argv, "m:")) != -1) { 
+	int r=40,l=1000;
+	while ((c = getopt(argc, argv, "hl:m:r:")) != -1) { 
 		switch(c) {
+			case 'h':
+				usage();
+				exit(0);
 			case 'm':
 				if (strcmp(optarg,"envelope")==0) {
 					mode = MODE_ENVELOPE;
@@ -406,6 +420,12 @@ void main (int argc, char **argv) {
 					exit(-1);
 				}
            		 	break;
+			case 'r':
+				r = atoi(optarg);
+				break;
+			case 'l':
+				l = atoi(optarg);
+				break;
 		}
 	}
 
@@ -431,7 +451,7 @@ void main (int argc, char **argv) {
 
 	switch (mode) {
 		case MODE_ENVELOPE:
-		envelope_service(device);
+		envelope_service(device,r,l);
 		break;
 		case MODE_IQ:
 		iq_service(device);
