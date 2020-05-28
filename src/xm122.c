@@ -13,6 +13,10 @@
 #define MODE_ENVELOPE  2
 #define MODE_IQ 3
 
+// Max size of buffer needed to store one frame
+// For IQ 16 bit x 2 x number of points
+#define FRAME_BUF_SIZE 65536
+
 
 
 // Signal handler sets this to 1 when signal received.
@@ -98,11 +102,17 @@ fprintf(stderr,"%d %d\n",address,value);
 	register_write_frame.end_marker = 0xCD;
 
 	// TODO: not gauranteed that all will be written in open write() call
-	write (device,&register_write_frame,sizeof(register_write_frame));
+	int bytes_written = 0;
+	while (bytes_written < sizeof(register_write_frame) ) {
+		bytes_written += write (device, &register_write_frame + bytes_written, sizeof(register_write_frame));
+	}
 
 	// Read the write register response back (10 bytes) and ignore
 	uint8_t buf[10];
-	read (device,buf,10);
+	int bytes_read = 0;
+	while (bytes_read < 10) {
+		bytes_read += read (device, buf, 10);
+	}
 }
 
 void register_read (int device, int address, uint32_t *value) {
@@ -176,7 +186,7 @@ void dump_envelope_data (int device) {
 		uint8_t packet_type;
 	} stream_frame_header;
 
-	uint8_t buf[8192];
+	uint8_t buf[FRAME_BUF_SIZE];
 
  	uint8_t b;
 	struct timespec timestamp; 
@@ -223,7 +233,7 @@ void dump_iq_data (int device) {
 		uint8_t packet_type;
 	} stream_frame_header;
 
-	uint8_t buf[4096];
+	uint8_t buf[FRAME_BUF_SIZE];
 
  	uint8_t b;
 	struct timespec timestamp; 
