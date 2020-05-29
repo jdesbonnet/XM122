@@ -24,7 +24,9 @@
 int stop_signal = 0;
 
 void usage() {
-	fprintf (stderr, "xm122 [-m mode] [-r start-of-range-cm] [-l length-of-range-cm]\n");
+	fprintf (stderr, "xm122 [-b] [-m mode] [-r start-of-range-cm] [-l length-of-range-cm]\n");
+	fprintf (stderr," -b : increase baudrate from default 115200\n");
+	fprintf (stderr," -m : mode envelope or iq\n");
 }
 
 int uart_set_interface_attribs (int fd, int speed, int parity) {
@@ -408,6 +410,8 @@ void main (int argc, char **argv) {
 
 	int mode = -1;
 
+	int baud_boost = 0;
+
 	// Parse command line arguments. See usage() for details.
 	// declaration 'char c' does not work on Raspberry Pi. 
 	// char seems to be redefined as uint8_t or something
@@ -415,8 +419,11 @@ void main (int argc, char **argv) {
 	//char c;
 	int8_t c;
 	int r=40,l=1000;
-	while ((c = getopt(argc, argv, "hl:m:r:")) != -1) { 
+	while ((c = getopt(argc, argv, "bhl:m:r:")) != -1) { 
 		switch(c) {
+			case 'b':
+				baud_boost = 1;
+				break;
 			case 'h':
 				usage();
 				exit(0);
@@ -456,6 +463,12 @@ void main (int argc, char **argv) {
 	int device = open ("/dev/ttyUSB0", O_RDWR | O_NOCTTY | O_SYNC);
 	uart_set_interface_attribs (device, B115200, 0);  // set speed to 115,200 bps, 8n1 (no parity)
 
+
+	if (baud_boost) {
+		register_write(device, 0x7, 921600 );
+		uart_set_interface_attribs (device, B921600, 0); 
+	}
+
 	// Copy to global for exit handler
 	//uart_device_handle = device;
 
@@ -474,6 +487,11 @@ void main (int argc, char **argv) {
 	// Clear UART buffer
 	sleep(2);
 	tcflush(device,TCIOFLUSH);
+
+	if (baud_boost) {
+                register_write(device, 0x7, 115200);
+                uart_set_interface_attribs (device, B115200, 0);
+	}
 }
 
 
