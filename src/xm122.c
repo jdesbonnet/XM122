@@ -24,9 +24,10 @@
 int stop_signal = 0;
 
 void usage() {
-	fprintf (stderr, "xm122 [-b] [-m mode] [-r start-of-range-cm] [-l length-of-range-cm]\n");
+	fprintf (stderr, "xm122 [-b] [-m mode] [-p profile] [-r start-of-range-cm] [-l length-of-range-cm]\n");
 	fprintf (stderr," -b : increase baudrate from default 115200\n");
-	fprintf (stderr," -m : mode envelope or iq\n");
+	fprintf (stderr," -m mode :envelope or iq\n");
+	fprintf (stderr," -p profile : 1=highest res... 5=highest gain\n");
 }
 
 int uart_set_interface_attribs (int fd, int speed, int parity) {
@@ -411,6 +412,7 @@ void main (int argc, char **argv) {
 	int mode = -1;
 
 	int baud_boost = 0;
+	int profile = 2;
 
 	// Parse command line arguments. See usage() for details.
 	// declaration 'char c' does not work on Raspberry Pi. 
@@ -419,7 +421,7 @@ void main (int argc, char **argv) {
 	//char c;
 	int8_t c;
 	int r=40,l=1000;
-	while ((c = getopt(argc, argv, "bhl:m:r:")) != -1) { 
+	while ((c = getopt(argc, argv, "bhl:m:p:r:")) != -1) { 
 		switch(c) {
 			case 'b':
 				baud_boost = 1;
@@ -437,6 +439,13 @@ void main (int argc, char **argv) {
 					exit(-1);
 				}
            		 	break;
+			case 'p':
+				profile = atoi(optarg);
+				if (profile<1 || profile>5) {
+					fprintf (stderr,"invalid profile number: 1-5 allowed\n");
+					exit(-1);
+				}
+				break;
 			case 'r':
 				r = atoi(optarg);
 				break;
@@ -468,6 +477,9 @@ void main (int argc, char **argv) {
 		register_write(device, 0x7, 921600 );
 		uart_set_interface_attribs (device, B921600, 0); 
 	}
+
+	// Set profile register
+	register_write(device, 0x28, profile);
 
 	// Copy to global for exit handler
 	//uart_device_handle = device;
