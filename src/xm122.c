@@ -13,7 +13,7 @@
 #define MODE_ENVELOPE  2
 #define MODE_IQ 3
 
-// Max size of buffer needed to store one frame
+// Max size of buffer needed to store one frame/sweep
 // For IQ 16 bit x 2 x number of points
 #define FRAME_BUF_SIZE 65536
 
@@ -24,7 +24,7 @@
 int stop_signal = 0;
 
 void usage() {
-	fprintf (stderr, "xm122 [-m mode] [-r start-of-range-cm] [-l length-of-range-cm]\n");
+	fprintf (stderr, "xm122 [-m mode] [-r start-of-range-mm] [-l length-of-range-mm]\n");
 }
 
 int uart_set_interface_attribs (int fd, int speed, int parity) {
